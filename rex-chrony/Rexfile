@@ -1,5 +1,4 @@
-use Rex -feature => ['1.16'];
-set remote_perl => "/usr/bin/perl";
+use Rex -feature => [qw/1.4 exec_autodie/];
 
 use Rex::Commands::Fs;
 use Rex::Commands::Run;
@@ -16,17 +15,16 @@ group allnodes => 'compute01', 'compute02', 'compute03';
 
 # Set the SSH user (replace with your actual username)
 user "user";
-
-# Enable sudo for all tasks
 sudo TRUE;
+sudo_password "$ENV{SUDOPASS}";
 
 # Main task to install and configure Chrony
+desc "Ensure chrony is installed and configured";
 task "setup_chrony", group => "allnodes", sub {
   my $hostname = connection->server;
   my $is_head  = ($hostname eq 'compute01');
 
-  # Update package index
-  run "apt-get update -qq";
+  say run "uname -a";
 
   # Install Chrony
   pkg "chrony", ensure => "present";
@@ -45,3 +43,7 @@ task "setup_chrony", group => "allnodes", sub {
   };
 };
 
+desc "Query time";
+task "query_time", group => "allnodes", sub {
+  say run "date +%s";
+};
