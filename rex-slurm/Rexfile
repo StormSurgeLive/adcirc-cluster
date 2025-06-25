@@ -39,7 +39,7 @@ task "setup_slurm", group => "allnodes", sub {
 
   # set proper permissions, applied to all nodes
   chown "munge", "/etc/munge/munge.key";
-  chmod 0400, "/etc/munge/munge.key";
+  chmod "0400", "/etc/munge/munge.key";
   service "munge" => "ensure", "start";
 };
 

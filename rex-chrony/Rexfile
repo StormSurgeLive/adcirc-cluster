@@ -26,7 +26,7 @@ task "setup_chrony", group => "allnodes", sub {
     source => $is_head ? "files/chrony-head.conf" : "files/chrony-worker.conf",
     owner  => "root",
     group  => "root",
-    mode   => 0644;
+    mode   => "0644";
 
   # Enable and start Chrony service
   service "chrony" => "ensure", "start";
