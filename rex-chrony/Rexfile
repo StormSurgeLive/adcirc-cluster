@@ -1,13 +1,5 @@
 use Rex -feature => [qw/1.4 exec_autodie/];
 
-use Rex::Commands::Fs;
-use Rex::Commands::Run;
-use Rex::Commands::Pkg;
-use Rex::Commands::Service;
-use Rex::Commands::File;
-use Rex::Commands::User;
-use Rex::Group;
-
 # Define the host groups
 group head     => 'compute01';
 group workers  => 'compute02', 'compute03';
@@ -37,10 +29,7 @@ task "setup_chrony", group => "allnodes", sub {
     mode   => 0644;
 
   # Enable and start Chrony service
-  service "chrony" => {
-    ensure => "started",
-    enable => 1,
-  };
+  service "chrony" => "ensure", "start";
 };
 
 desc "Query time";
