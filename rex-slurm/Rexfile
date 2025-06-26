@@ -18,35 +18,85 @@ task "setup_slurm", group => "allnodes", sub {
 
   say run "uname -a";
 
-  # Install Chrony
+  # Install Slurm and munge 
   pkg "slurm-wlm", ensure => "present";
   pkg "munge",     ensure => "present";
 
   if ($is_head) {
     # generate munge key on head node
-    if (not is_file "/etc/munge/munge.key") {
-      run "mungekey --create";
+    run "mungekey --create --force";
+
+    # set proper permissions, applied to all nodes
+    chown "munge", "/etc/munge/munge.key";
+    chmod "0644", "/etc/munge/munge.key";
+
+    cp "/etc/munge/munge.key", "/home/user/adcirc-cluster/slurm-setup/rex-slurm/munge.key";
+
+    # write slurm.conf on head node
+    file  "/etc/slurm/slurm.conf",
+      source => "files/slurm.conf",
+      owner  => "slurm",
+      mode   => "0644";
+
+    # sudo mkdir -p /var/spool/slurmctld /var/spool/slurmd
+    # sudo chown slurm: /var/spool/slurmctld /var/spool/slurmd
+    foreach my $dir (qw{/var/spool/slurmctld /var/spool/slurmd}) {
+      file $dir,
+        ensure => "directory",
+        owner  => "slurm",
+        group  => "slurm",
+        mode   => "0750";
     }
-    # copy to make available on other nodes
-    if (is_file "/etc/munge/munge.key" and not is_file "/mnt/home/munge.key") {
-        file '/mnt/home/munge.key',
-          source => '/etc/munge/munge.key',
-          owner  => 'munge',
-          mode   => '0400';
-    }
+
+    run "pkill munge || echo";
+    service "munge" => "ensure", "started";
+
+    chmod "0400", "/etc/munge/munge.key";
+    run "pkill munge || echo";
+    service "munge" => "ensure", "started";
+
+    run "pkill slurmctld || echo";
+    service "slurmctld" => "ensure", "started"; # start controller node
   }
-  elsif (not is_file '/mnt/home/munge.key') {
-      # copy from head node
-      file '/etc/munge/munge.key',
-        source => '/mnt/home/munge.key',
-        owner  => 'munge',
-        mode   => '0400';
+  else {
+
+    # ensure munge key is not there
+    file "/etc/munge/munge.key",
+      ensure => "absent";
+
+    # copy to make available on other nodes
+    file "/etc/munge/munge.key",
+      source => "/home/user/adcirc-cluster/slurm-setup/rex-slurm/munge.key",
+      owner  => "munge",
+      mode   => "0644";
+
+    # write slurm.conf on head node
+    file  "/etc/slurm/slurm.conf",
+      source => "files/slurm.conf",
+      owner  => "slurm",
+      mode   => "0644";
+
+    # sudo mkdir -p /var/spool/slurmctld /var/spool/slurmd
+    # sudo chown slurm: /var/spool/slurmctld /var/spool/slurmd
+    foreach my $dir (qw{/var/spool/slurmctld /var/spool/slurmd}) {
+      file $dir,
+        ensure => "directory",
+        owner  => "slurm",
+        group  => "slurm",
+        mode   => "0750";
+    }
+
+    # set proper permissions, applied to all nodes
+    chown "root", "/etc/munge";
+    chmod "0755", "/etc/munge";
+
+    chmod "0400", "/etc/munge/munge.key";
+    run "pkill munge || echo";
+    service "munge" => "ensure", "started";
   }
 
-  # set proper permissions, applied to all nodes
-  chown "munge", "/etc/munge/munge.key";
-  chmod "0400", "/etc/munge/munge.key";
-  service "munge" => "ensure", "start";
+  run "pkill slurmd || echo";
+  service "slurmd" => "ensure", "start";      # start as compute node
 };
 
 desc "Query time";
