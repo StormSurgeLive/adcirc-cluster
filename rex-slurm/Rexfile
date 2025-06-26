@@ -29,12 +29,18 @@ task "setup_slurm", group => "allnodes", sub {
     }
     # copy to make available on other nodes
     if (is_file "/etc/munge/munge.key" and not is_file "/mnt/home/munge.key") {
-      cp "/etc/munge/munge.key", "/mnt/home/munge.key";
+        file '/mnt/home/munge.key',
+          source => '/etc/munge/munge.key',
+          owner  => 'munge',
+          mode   => '0400';
     }
   }
   elsif (not is_file '/mnt/home/munge.key') {
       # copy from head node
-      cp "/mnt/home/munge.key", "/etc/munge/munge.key";
+      file '/etc/munge/munge.key',
+        source => '/mnt/home/munge.key',
+        owner  => 'munge',
+        mode   => '0400';
   }
 
   # set proper permissions, applied to all nodes
