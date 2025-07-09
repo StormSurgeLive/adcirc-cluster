@@ -2,8 +2,7 @@ use Rex -feature => [qw/1.4 exec_autodie/];
 
 # Define the host groups
 group head     => 'compute01';
-group workers  => 'compute02', 'compute03';
-group allnodes => 'compute01', 'compute02', 'compute03';
+group workers  => 'compute01', 'compute02', 'compute03';
 
 # Set the SSH user (replace with your actual username)
 user "user";
@@ -12,7 +11,7 @@ sudo_password "$ENV{SUDOPASS}";
 
 # Main task to install and configure Chrony
 desc "Ensure slurm is installed and configured";
-task "setup_slurm", group => "allnodes", sub {
+task "setup_slurm", group => "workers", sub {
   my $hostname = connection->server;
   my $is_head  = ($hostname eq 'compute01');
 
@@ -20,9 +19,16 @@ task "setup_slurm", group => "allnodes", sub {
 
   # Install Slurm and munge 
   pkg "slurm-wlm", ensure => "present";
+  pkg "slurm-wlm-basic-plugins", ensure => "present";
   pkg "munge",     ensure => "present";
 
   if ($is_head) {
+    file "/etc/munge/munge.key",
+      ensure => "absent";
+
+    file "/home/user/adcirc-cluster/slurm-setup/rex-slurm/munge.key",
+      ensure => "absent";
+
     # generate munge key on head node
     run "mungekey --create --force";
 
@@ -36,11 +42,19 @@ task "setup_slurm", group => "allnodes", sub {
     file  "/etc/slurm/slurm.conf",
       source => "files/slurm.conf",
       owner  => "slurm",
+      group  => "slurm",
+      mode   => "0644";
+
+    # write cgroup.conf on head node
+    file  "/etc/slurm/cgroup.conf",
+      source => "files/cgroup.conf",
+      owner  => "slurm",
+      group  => "slurm",
       mode   => "0644";
 
     # sudo mkdir -p /var/spool/slurmctld /var/spool/slurmd
     # sudo chown slurm: /var/spool/slurmctld /var/spool/slurmd
-    foreach my $dir (qw{/var/spool/slurmctld /var/spool/slurmd}) {
+    foreach my $dir (qw{/var/spool/slurmctld /var/spool/slurmd /var/log/slurm}) {
       file $dir,
         ensure => "directory",
         owner  => "slurm",
@@ -48,15 +62,11 @@ task "setup_slurm", group => "allnodes", sub {
         mode   => "0750";
     }
 
-    run "pkill munge || echo";
-    service "munge" => "ensure", "started";
-
     chmod "0400", "/etc/munge/munge.key";
-    run "pkill munge || echo";
-    service "munge" => "ensure", "started";
 
-    run "pkill slurmctld || echo";
-    service "slurmctld" => "ensure", "started"; # start controller node
+    service "munge" => "restart";
+
+    service "slurmctld" => "restart"; # start controller node
   }
   else {
 
@@ -68,17 +78,26 @@ task "setup_slurm", group => "allnodes", sub {
     file "/etc/munge/munge.key",
       source => "/home/user/adcirc-cluster/slurm-setup/rex-slurm/munge.key",
       owner  => "munge",
+      group  => "munge",
       mode   => "0644";
 
     # write slurm.conf on head node
     file  "/etc/slurm/slurm.conf",
       source => "files/slurm.conf",
       owner  => "slurm",
+      group  => "slurm",
+      mode   => "0644";
+
+    # write cgroup.conf on head node
+    file  "/etc/slurm/cgroup.conf",
+      source => "files/cgroup.conf",
+      owner  => "slurm",
+      group  => "slurm",
       mode   => "0644";
 
     # sudo mkdir -p /var/spool/slurmctld /var/spool/slurmd
     # sudo chown slurm: /var/spool/slurmctld /var/spool/slurmd
-    foreach my $dir (qw{/var/spool/slurmctld /var/spool/slurmd}) {
+    foreach my $dir (qw{/var/spool/slurmctld /var/spool/slurmd /var/log/slurm}) {
       file $dir,
         ensure => "directory",
         owner  => "slurm",
@@ -91,15 +110,14 @@ task "setup_slurm", group => "allnodes", sub {
     chmod "0755", "/etc/munge";
 
     chmod "0400", "/etc/munge/munge.key";
-    run "pkill munge || echo";
-    service "munge" => "ensure", "started";
+
+    service "munge" => "restart";
   }
 
-  run "pkill slurmd || echo";
-  service "slurmd" => "ensure", "start";      # start as compute node
+  service "slurmd" => "restart";      # start as compute node
 };
 
 desc "Query time";
-task "query_time", group => "allnodes", sub {
+task "query_time", group => "workers", sub {
   say run "date +%s";
 };
