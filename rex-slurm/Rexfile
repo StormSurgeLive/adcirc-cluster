@@ -18,8 +18,11 @@ task "setup_slurm", group => "workers", sub {
   say run "uname -a";
 
   # Install Slurm and munge 
+  pkg "libpmix2t64", ensure => "present";
+  pkg "libpmix-dev", ensure => "present";
   pkg "slurm-wlm", ensure => "present";
   pkg "slurm-wlm-basic-plugins", ensure => "present";
+  pkg "libslurm-dev", ensure => "present";
   pkg "munge",     ensure => "present";
 
   if ($is_head) {
